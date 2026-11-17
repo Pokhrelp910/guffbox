@@ -27,6 +27,7 @@ export interface Player {
   role: 'batsman' | 'bowler' | 'all-rounder' | 'wicket-keeper';
   isCaptain?: boolean;
   isWicketKeeper?: boolean;
+  photoUrl?: string;
 }
 
 export interface Team {
@@ -59,6 +60,25 @@ export interface PenaltyEvent {
   reason: string;
 }
 
+export type CricketShotZone =
+  | 'fine_leg'
+  | 'square_leg'
+  | 'mid_wicket'
+  | 'long_on'
+  | 'straight'
+  | 'long_off'
+  | 'extra_cover'
+  | 'cover'
+  | 'point'
+  | 'third_man';
+
+export type CricketPitchLength =
+  | 'yorker'
+  | 'full'
+  | 'good_length'
+  | 'back_of_length'
+  | 'short';
+
 export interface BallDeliveryEvent {
   id: string;
   inningsNumber: 1 | 2;
@@ -73,6 +93,7 @@ export interface BallDeliveryEvent {
   runsBat: number;
   runsExtras: number;
   extraType: ExtraType;
+  extraSubType?: 'bye' | 'leg_bye'; // For distinguishing byes vs leg-byes on No-Ball
   physicalRunsRan: number; // MCC Law: Only physical runs ran rotate strike
   
   // Boundary flags
@@ -87,6 +108,10 @@ export interface BallDeliveryEvent {
   // Compound events
   wicket?: WicketEvent;
   penalty?: PenaltyEvent;
+
+  // Visual shot tracking
+  shotZone?: CricketShotZone;
+  pitchLength?: CricketPitchLength;
   
   // UI Display
   displayBadge: string; // e.g. "0", "1", "4", "6", "W", "Wd", "Nb", "+5P"

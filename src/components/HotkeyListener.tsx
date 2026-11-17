@@ -13,6 +13,9 @@ interface HotkeyHandlerProps {
   onUndo: () => void;
   onRedo: () => void;
   onSwapStrike: () => void;
+  onToggleHelp?: () => void;
+  onCustomExtra?: () => void;
+  onTriggerSound?: (sound: 'airhorn' | 'cheer' | 'appeal' | 'clap' | 'whistle' | 'fanfare') => void;
   disabled?: boolean;
 }
 
@@ -27,6 +30,9 @@ export const useCricketHotkeys = ({
   onUndo,
   onRedo,
   onSwapStrike,
+  onToggleHelp,
+  onCustomExtra,
+  onTriggerSound,
   disabled = false,
 }: HotkeyHandlerProps) => {
   useEffect(() => {
@@ -37,6 +43,40 @@ export const useCricketHotkeys = ({
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') {
         return;
+      }
+
+      // Soundboard Hotkeys: Alt + 1..6 (or Shift + 1..6)
+      if (onTriggerSound && (e.altKey || (e.shiftKey && !e.ctrlKey))) {
+        if (e.key === '1' || e.code === 'Digit1') {
+          e.preventDefault();
+          onTriggerSound('airhorn');
+          return;
+        }
+        if (e.key === '2' || e.code === 'Digit2') {
+          e.preventDefault();
+          onTriggerSound('cheer');
+          return;
+        }
+        if (e.key === '3' || e.code === 'Digit3') {
+          e.preventDefault();
+          onTriggerSound('appeal');
+          return;
+        }
+        if (e.key === '4' || e.code === 'Digit4') {
+          e.preventDefault();
+          onTriggerSound('clap');
+          return;
+        }
+        if (e.key === '5' || e.code === 'Digit5') {
+          e.preventDefault();
+          onTriggerSound('whistle');
+          return;
+        }
+        if (e.key === '6' || e.code === 'Digit6') {
+          e.preventDefault();
+          onTriggerSound('fanfare');
+          return;
+        }
       }
 
       // Undo: Ctrl+Z or Cmd+Z
@@ -101,6 +141,22 @@ export const useCricketHotkeys = ({
         onPenalty();
         return;
       }
+      if (e.key.toLowerCase() === 'e' && !e.ctrlKey && !e.metaKey) { // 'e' for Custom Extra
+        if (onCustomExtra) {
+          e.preventDefault();
+          onCustomExtra();
+          return;
+        }
+      }
+
+      // Help cheatsheet: H or ?
+      if ((e.key.toLowerCase() === 'h' || e.key === '?') && !e.ctrlKey && !e.metaKey) {
+        if (onToggleHelp) {
+          e.preventDefault();
+          onToggleHelp();
+          return;
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -117,5 +173,8 @@ export const useCricketHotkeys = ({
     onUndo,
     onRedo,
     onSwapStrike,
+    onToggleHelp,
+    onCustomExtra,
+    onTriggerSound,
   ]);
 };

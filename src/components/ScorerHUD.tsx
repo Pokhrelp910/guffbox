@@ -5,16 +5,24 @@ import {
   MatchState,
   BallDeliveryEvent,
   DismissalType,
+  ExtraType,
   MediaEventKey,
   Player,
 } from '../core/types';
 import { useCricketHotkeys } from './HotkeyListener';
 import { createPenaltyEvent } from '../core/penalty-rules';
+import { calculateCurtailedOversQuota } from '../core/target-calculator';
 import { RunOutModal } from './RunOutModal';
+import { WicketModal } from './WicketModal';
+import { AdvancedExtrasModal, AdvancedExtraSubmitParams } from './AdvancedExtrasModal';
 import { PenaltyModal } from './PenaltyModal';
 import { InterruptionModal } from './InterruptionModal';
 import { MediaManagerModal } from './MediaManagerModal';
+import { HotkeyModal } from './HotkeyModal';
 import { FullScorecard } from '../overlays/FullScorecard';
+import { LivePlayerPickerModal } from './LivePlayerPickerModal';
+import { stadiumAudio } from '../utils/soundEffects';
+import { broadcastSync } from '../utils/broadcastSync';
 
 interface ScorerHUDProps {
   match: MatchState;
@@ -24,10 +32,19 @@ interface ScorerHUDProps {
   canUndo: boolean;
   canRedo: boolean;
   onSwapStrikeManual: () => void;
+  onChangeStriker?: (newStrikerId: string) => void;
+  onChangeNonStriker?: (newNonStrikerId: string) => void;
   onChangeBowler: (newBowlerId: string) => void;
+  onAddPlayerToTeam?: (
+    teamId: string,
+    player: Player,
+    selectAs?: 'striker' | 'nonStriker' | 'bowler' | 'nextBatter'
+  ) => void;
   onStartSecondInnings: () => void;
   onUpdateMetadata: (curtailedOvers: number, revisedTarget?: number) => void;
   onTriggerAnimation: (key: MediaEventKey) => void;
+  onOpenPreMatch?: () => void;
+  onResetMatch?: () => void;
 }
 
 export const ScorerHUD: React.FC<ScorerHUDProps> = ({
@@ -38,11 +55,20 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
   canUndo,
   canRedo,
   onSwapStrikeManual,
+  onChangeStriker,
+  onChangeNonStriker,
   onChangeBowler,
+  onAddPlayerToTeam,
   onStartSecondInnings,
   onUpdateMetadata,
   onTriggerAnimation,
+  onOpenPreMatch,
+  onResetMatch,
 }) => {
+  const [playerPickerConfig, setPlayerPickerConfig] = useState<{
+    isOpen: boolean;
+    mode: 'bowler' | 'striker' | 'nonStriker';
+  } | null>(null);
   const isSecondInnings = match.currentInningsNumber === 2;
   const currentInnings = isSecondInnings && match.innings2 ? match.innings2 : match.innings1;
   const battingTeam = currentInnings.battingTeamId === match.teamA.id ? match.teamA : match.teamB;
@@ -51,25 +77,51 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
   const striker = currentInnings.batterStats[currentInnings.strikerId];
   const nonStriker = currentInnings.batterStats[currentInnings.nonStrikerId];
 
+  // Bowler quota calculation based on curtailed or scheduled overs
+  const maxOversLimit = match.metadata.curtailedOvers || match.metadata.scheduledOvers;
+  const bowlerQuota = calculateCurtailedOversQuota(match.metadata.scheduledOvers, maxOversLimit);
+
   // Modals state
   const [showRunOutModal, setShowRunOutModal] = useState(false);
   const [showPenaltyModal, setShowPenaltyModal] = useState(false);
   const [showInterruptionModal, setShowInterruptionModal] = useState(false);
   const [showMediaModal, setShowMediaModal] = useState(false);
   const [showScorecardModal, setShowScorecardModal] = useState(false);
+  const [showHotkeyModal, setShowHotkeyModal] = useState(false);
+  const [showWicketModal, setShowWicketModal] = useState(false);
+  const [pendingDismissalType, setPendingDismissalType] = useState<DismissalType>('bowled');
   const [showWicketDropdown, setShowWicketDropdown] = useState(false);
   const [showWideSubmenu, setShowWideSubmenu] = useState(false);
   const [showNoBallSubmenu, setShowNoBallSubmenu] = useState(false);
   const [showByesSubmenu, setShowByesSubmenu] = useState(false);
   const [showLegByesSubmenu, setShowLegByesSubmenu] = useState(false);
+  const [showAdvancedExtrasModal, setShowAdvancedExtrasModal] = useState(false);
+  const [advancedExtraInitialType, setAdvancedExtraInitialType] = useState<'wide' | 'noball' | 'bye' | 'leg_bye'>('wide');
 
-  // Available batters who haven't batted yet
-  const availableBatters: Player[] = battingTeam.squad.filter(
+  const openAdvancedExtras = (type: 'wide' | 'noball' | 'bye' | 'leg_bye' = 'wide') => {
+    setShowWideSubmenu(false);
+    setShowNoBallSubmenu(false);
+    setShowByesSubmenu(false);
+    setShowLegByesSubmenu(false);
+    setAdvancedExtraInitialType(type);
+    setShowAdvancedExtrasModal(true);
+  };
+
+  // Available batters who haven't batted yet (filtered by Playing XI)
+  const playing11Batters: Player[] = battingTeam.playing11 && battingTeam.playing11.length > 0
+    ? battingTeam.squad.filter((p) => battingTeam.playing11.includes(p.id))
+    : battingTeam.squad;
+
+  const availableBatters: Player[] = playing11Batters.filter(
     (p) => !currentInnings.batterStats[p.id]?.isOut && p.id !== currentInnings.strikerId && p.id !== currentInnings.nonStrikerId
   );
 
-  // Available bowlers in bowling squad
-  const availableBowlers: Player[] = bowlingTeam.squad;
+  // Available bowlers in bowling squad (filtered by Playing XI)
+  const playing11Bowlers: Player[] = bowlingTeam.playing11 && bowlingTeam.playing11.length > 0
+    ? bowlingTeam.squad.filter((p) => bowlingTeam.playing11.includes(p.id))
+    : bowlingTeam.squad;
+
+  const availableBowlers: Player[] = playing11Bowlers.length > 0 ? playing11Bowlers : bowlingTeam.squad;
 
   // Helper to generate unique ball id
   const newBallId = () => `ball_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -128,7 +180,7 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
       id: newBallId(),
       inningsNumber: match.currentInningsNumber,
       overIndex: Math.floor(currentInnings.legalBalls / 6),
-      ballInOver: currentInnings.currentOverLegalBalls,
+      ballInOver: (currentInnings.currentOverLegalBalls % 6) + 1,
       legalBallCounted: false,
       strikerId: currentInnings.strikerId,
       nonStrikerId: currentInnings.nonStrikerId,
@@ -160,7 +212,7 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
       id: newBallId(),
       inningsNumber: match.currentInningsNumber,
       overIndex: Math.floor(currentInnings.legalBalls / 6),
-      ballInOver: currentInnings.currentOverLegalBalls,
+      ballInOver: (currentInnings.currentOverLegalBalls % 6) + 1,
       legalBallCounted: false,
       strikerId: currentInnings.strikerId,
       nonStrikerId: currentInnings.nonStrikerId,
@@ -214,24 +266,76 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
     onDeliverBall(delivery, isLegBye ? 'leg_bye' : 'bye');
   };
 
-  // 5. Standard Wickets
-  const handleWicket = (type: DismissalType, newBatterId?: string) => {
+  // 4b. Wide + Stumped (compound delivery)
+  const handleWideStumped = (newBatterId?: string) => {
+    setShowWideSubmenu(false);
+    const nextBatter = newBatterId || availableBatters[0]?.id;
+
+    const delivery: BallDeliveryEvent = {
+      id: newBallId(),
+      inningsNumber: match.currentInningsNumber,
+      overIndex: Math.floor(currentInnings.legalBalls / 6),
+      ballInOver: (currentInnings.currentOverLegalBalls % 6) + 1,
+      legalBallCounted: false, // Wide does not count as legal ball
+      strikerId: currentInnings.strikerId,
+      nonStrikerId: currentInnings.nonStrikerId,
+      bowlerId: currentInnings.currentBowlerId,
+      runsBat: 0,
+      runsExtras: 1, // 1 wide extra
+      extraType: 'wide',
+      physicalRunsRan: 0,
+      isBoundary: false,
+      isFour: false,
+      isSix: false,
+      isFreeHitDelivery: currentInnings.isFreeHitActive,
+      causesFreeHit: false,
+      wicket: {
+        type: 'stumped',
+        playerOutId: currentInnings.strikerId,
+        assistedById: 'wk',
+        runsCompletedBeforeOut: 0,
+        creditBowler: true, // Stumped on wide credits bowler!
+        newBatterId: nextBatter,
+      },
+      displayBadge: 'Wd+W',
+      timestamp: Date.now(),
+    };
+
+    onDeliverBall(delivery, 'stumped');
+  };
+
+  // 5. Standard Wickets — opens WicketModal so commentator explicitly selects the incoming batter!
+  const handleWicket = (type: DismissalType) => {
     setShowWicketDropdown(false);
 
-    // Free hit dismissal check: Only run_out, obstructing_field, hit_ball_twice are out on Free Hit
+    // Free hit dismissal check: Only run_out, obstructing_field, hit_ball_twice, handling_ball, timed_out are out on Free Hit (ICC Law 21.19)
     if (
       currentInnings.isFreeHitActive &&
       type !== 'run_out' &&
       type !== 'obstructing_field' &&
-      type !== 'hit_ball_twice'
+      type !== 'hit_ball_twice' &&
+      type !== 'handling_ball' &&
+      type !== 'timed_out'
     ) {
       alert("NOT OUT! Batter cannot be dismissed on a Free Hit via Bowled, Caught, LBW, or Stumped (ICC Law 21.19).");
       return;
     }
 
-    const nextBatter = newBatterId || availableBatters[0]?.id;
-    const isGoldenDuck = striker?.ballsFaced === 0 && (type === 'bowled' || type === 'lbw');
-    const isDuck = striker?.runs === 0 && !isGoldenDuck;
+    setPendingDismissalType(type);
+    setShowWicketModal(true);
+  };
+
+  const handleConfirmWicketModal = (params: {
+    dismissalType: DismissalType;
+    playerOutId: string;
+    newBatterId: string;
+    assistedByName?: string;
+  }) => {
+    setShowWicketModal(false);
+
+    const dismissedBatter = currentInnings.batterStats[params.playerOutId];
+    const isGoldenDuck = dismissedBatter?.ballsFaced === 0;
+    const isDuck = dismissedBatter?.runs === 0 && !isGoldenDuck;
 
     const creditBowler = [
       'bowled',
@@ -241,7 +345,7 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
       'lbw',
       'stumped',
       'hit_wicket',
-    ].includes(type);
+    ].includes(params.dismissalType);
 
     const delivery: BallDeliveryEvent = {
       id: newBallId(),
@@ -262,50 +366,90 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
       isFreeHitDelivery: currentInnings.isFreeHitActive,
       causesFreeHit: false,
       wicket: {
-        type,
-        playerOutId: currentInnings.strikerId,
+        type: params.dismissalType,
+        playerOutId: params.playerOutId,
+        assistedById: params.assistedByName,
         runsCompletedBeforeOut: 0,
         creditBowler,
-        newBatterId: nextBatter,
+        newBatterId: params.newBatterId || undefined,
       },
       displayBadge: 'W',
       timestamp: Date.now(),
     };
 
-    let animKey: MediaEventKey = type as MediaEventKey;
+    let animKey: MediaEventKey = params.dismissalType as MediaEventKey;
     if (isGoldenDuck) animKey = 'golden_duck';
     else if (isDuck) animKey = 'duck_out';
 
     onDeliverBall(delivery, animKey);
   };
 
-  // 6. Run Out from modal
+  // 6. Run Out from modal (supports Legal, Wide, or No-ball)
   const handleConfirmRunOut = (params: {
     playerOutId: string;
     runsCompleted: number;
     fielderName?: string;
     newBatterId: string;
+    deliveryType: 'legal' | 'wide' | 'noball' | 'bye' | 'leg_bye';
   }) => {
     setShowRunOutModal(false);
+
+    const isWide = params.deliveryType === 'wide';
+    const isNoBall = params.deliveryType === 'noball';
+    const isBye = params.deliveryType === 'bye';
+    const isLegBye = params.deliveryType === 'leg_bye';
+    const legalBallCounted = !isWide && !isNoBall;
+
+    let runsBat = 0;
+    let runsExtras = 0;
+    let extraType: ExtraType = 'none';
+    let badge = 'W';
+
+    if (isWide) {
+      extraType = 'wide';
+      runsExtras = 1 + params.runsCompleted; // 1 wide + completed runs as byes
+      runsBat = 0;
+      badge = params.runsCompleted > 0 ? `Wd+W(${params.runsCompleted})` : 'Wd+W';
+    } else if (isNoBall) {
+      extraType = 'noball';
+      runsExtras = 1; // 1 noball penalty
+      runsBat = params.runsCompleted;
+      badge = params.runsCompleted > 0 ? `Nb+W(${params.runsCompleted})` : 'Nb+W';
+    } else if (isBye) {
+      extraType = 'bye';
+      runsExtras = params.runsCompleted;
+      runsBat = 0;
+      badge = params.runsCompleted > 0 ? `${params.runsCompleted}B+W` : 'B+W';
+    } else if (isLegBye) {
+      extraType = 'leg_bye';
+      runsExtras = params.runsCompleted;
+      runsBat = 0;
+      badge = params.runsCompleted > 0 ? `${params.runsCompleted}Lb+W` : 'Lb+W';
+    } else {
+      runsBat = params.runsCompleted;
+      runsExtras = 0;
+      extraType = 'none';
+      badge = params.runsCompleted > 0 ? `W+${params.runsCompleted}` : 'W';
+    }
 
     const delivery: BallDeliveryEvent = {
       id: newBallId(),
       inningsNumber: match.currentInningsNumber,
       overIndex: Math.floor(currentInnings.legalBalls / 6),
       ballInOver: (currentInnings.currentOverLegalBalls % 6) + 1,
-      legalBallCounted: true,
+      legalBallCounted,
       strikerId: currentInnings.strikerId,
       nonStrikerId: currentInnings.nonStrikerId,
       bowlerId: currentInnings.currentBowlerId,
-      runsBat: params.runsCompleted,
-      runsExtras: 0,
-      extraType: 'none',
+      runsBat,
+      runsExtras,
+      extraType,
       physicalRunsRan: params.runsCompleted,
       isBoundary: false,
       isFour: false,
       isSix: false,
       isFreeHitDelivery: currentInnings.isFreeHitActive,
-      causesFreeHit: false,
+      causesFreeHit: isNoBall,
       wicket: {
         type: 'run_out',
         playerOutId: params.playerOutId,
@@ -314,11 +458,46 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
         creditBowler: false,
         newBatterId: params.newBatterId,
       },
-      displayBadge: params.runsCompleted > 0 ? `W+${params.runsCompleted}` : 'W',
+      displayBadge: badge,
       timestamp: Date.now(),
     };
 
     onDeliverBall(delivery, 'run_out');
+  };
+
+  // 6b. Advanced Extras & Compound Delivery Confirmation (MCC Laws 21, 22, 23 & 38)
+  const handleConfirmAdvancedExtra = (params: AdvancedExtraSubmitParams) => {
+    setShowAdvancedExtrasModal(false);
+
+    const isWide = params.extraType === 'wide';
+    const isNoBall = params.extraType === 'noball';
+    const legalBallCounted = !isWide && !isNoBall;
+
+    const delivery: BallDeliveryEvent = {
+      id: newBallId(),
+      inningsNumber: match.currentInningsNumber,
+      overIndex: Math.floor(currentInnings.legalBalls / 6),
+      ballInOver: (currentInnings.currentOverLegalBalls % 6) + 1,
+      legalBallCounted,
+      strikerId: currentInnings.strikerId,
+      nonStrikerId: currentInnings.nonStrikerId,
+      bowlerId: currentInnings.currentBowlerId,
+      runsBat: params.runsBat,
+      runsExtras: params.runsExtras,
+      extraType: params.extraType,
+      extraSubType: params.extraSubType,
+      physicalRunsRan: params.physicalRunsRan,
+      isBoundary: params.isBoundary,
+      isFour: params.isFour,
+      isSix: params.isSix,
+      isFreeHitDelivery: currentInnings.isFreeHitActive,
+      causesFreeHit: isNoBall,
+      wicket: params.wicket,
+      displayBadge: params.displayBadge,
+      timestamp: Date.now(),
+    };
+
+    onDeliverBall(delivery, params.animKey);
   };
 
   // 7. Penalty runs from modal
@@ -328,7 +507,7 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
     const delivery = createPenaltyEvent({
       inningsNumber: match.currentInningsNumber,
       overIndex: Math.floor(currentInnings.legalBalls / 6),
-      ballInOver: currentInnings.currentOverLegalBalls,
+      ballInOver: (currentInnings.currentOverLegalBalls % 6) + 1,
       strikerId: currentInnings.strikerId,
       nonStrikerId: currentInnings.nonStrikerId,
       bowlerId: currentInnings.currentBowlerId,
@@ -352,30 +531,65 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
     onUndo,
     onRedo,
     onSwapStrike: onSwapStrikeManual,
-    disabled: showRunOutModal || showPenaltyModal || showInterruptionModal || showMediaModal || showScorecardModal,
+    onToggleHelp: () => setShowHotkeyModal((prev) => !prev),
+    onCustomExtra: () => openAdvancedExtras('wide'),
+    onTriggerSound: (sound) => {
+      if (sound === 'airhorn') stadiumAudio.playAirhorn();
+      else if (sound === 'cheer') stadiumAudio.playCrowdCheer();
+      else if (sound === 'appeal') stadiumAudio.playAppeal();
+      else if (sound === 'clap') stadiumAudio.playClapping();
+      else if (sound === 'whistle') stadiumAudio.playWhistle();
+      else if (sound === 'fanfare') stadiumAudio.playFanfare();
+      broadcastSync.publish({ type: 'TRIGGER_SOUND', sound });
+    },
+    disabled: showRunOutModal || showPenaltyModal || showInterruptionModal || showMediaModal || showScorecardModal || showHotkeyModal || showAdvancedExtrasModal,
   });
 
   return (
-    <div className="w-full bg-slate-900 border-b-2 border-slate-700 text-white select-none shadow-xl">
+    <div
+      className="w-full text-white select-none shadow-xl border-b-2"
+      style={{
+        background: 'linear-gradient(145deg, #070d1e 0%, #1c050a 100%)',
+        borderColor: 'rgba(250,204,21,0.3)',
+      }}
+    >
       
       {/* TOP STATUS BAR & OPERATOR ACTIONS */}
-      <div className="flex flex-wrap items-center justify-between px-4 py-2 bg-slate-950 border-b border-slate-800 text-xs">
+      <div
+        className="flex flex-wrap items-center justify-between px-4 py-2 text-xs border-b"
+        style={{
+          background: 'linear-gradient(90deg, rgba(8,16,38,0.98) 0%, rgba(32,5,11,0.98) 50%, rgba(8,16,38,0.98) 100%)',
+          borderColor: 'rgba(250,204,21,0.2)',
+        }}
+      >
         <div className="flex items-center space-x-3">
           <span className="font-extrabold text-yellow-400 font-['Teko'] text-lg tracking-wider">
             GUFFBOX COCKPIT
           </span>
-          <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono">
-            Innings {match.currentInningsNumber} • {battingTeam.shortName} vs {bowlingTeam.shortName}
+          <span className="bg-blue-950/90 text-white border border-yellow-500/30 px-2 py-0.5 rounded font-mono">
+            Innings {match.currentInningsNumber} • <span className="text-yellow-400 font-bold">{battingTeam.shortName}</span> vs <span className="text-white">{bowlingTeam.shortName}</span>
           </span>
           {currentInnings.isFreeHitActive && (
-            <span className="bg-red-600 text-white font-bold px-2 py-0.5 rounded animate-pulse">
+            <span className="bg-red-600 text-yellow-300 font-bold px-2 py-0.5 rounded animate-pulse border border-yellow-400">
               ⚡ FREE HIT ACTIVE
             </span>
           )}
         </div>
 
         {/* Global Controls */}
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Pre-Match Setup */}
+          {onOpenPreMatch && (
+            <button
+              onClick={onOpenPreMatch}
+              className="bg-slate-800 hover:bg-slate-700 text-yellow-300 font-bold px-2.5 py-1 rounded-lg border border-slate-700 flex items-center space-x-1"
+              title="Open Pre-Match Setup & Teams"
+            >
+              <span>⚙️</span>
+              <span>Pre-Match</span>
+            </button>
+          )}
+
           {/* Strike Swap */}
           <button
             onClick={onSwapStrikeManual}
@@ -386,19 +600,34 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
           </button>
 
           {/* Bowler Selector */}
-          <div className="flex items-center space-x-1">
-            <span className="text-slate-400 font-semibold">Bowler:</span>
+          <div className="flex items-center space-x-1.5">
+            <span className="text-white/80 font-bold text-xs">Bowler:</span>
             <select
               value={currentInnings.currentBowlerId}
-              onChange={(e) => onChangeBowler(e.target.value)}
-              className="bg-slate-800 text-yellow-300 font-bold px-2 py-1 rounded-lg border border-slate-700 focus:outline-none"
+              onChange={(e) => {
+                if (e.target.value === '__FIND_OR_ADD_BOWLER__') {
+                  setPlayerPickerConfig({ isOpen: true, mode: 'bowler' });
+                } else {
+                  onChangeBowler(e.target.value);
+                }
+              }}
+              className="bg-[#0a1226] text-yellow-300 font-bold px-2 py-1 rounded-lg border border-yellow-500/30 focus:outline-none text-xs cursor-pointer"
             >
               {availableBowlers.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.name} ({currentInnings.bowlerStats[b.id]?.oversFormatted || '0.0'})
+                  {b.name} ({currentInnings.bowlerStats[b.id]?.oversFormatted || '0.0'} / max {bowlerQuota.maxOversPerBowler} ov)
                 </option>
               ))}
+              <option value="__FIND_OR_ADD_BOWLER__">➕ Type & Find / Create Bowler...</option>
             </select>
+            <button
+              type="button"
+              onClick={() => setPlayerPickerConfig({ isOpen: true, mode: 'bowler' })}
+              className="bg-[#14224c] hover:bg-[#1f3575] text-yellow-300 font-bold px-2 py-1 rounded-lg border border-yellow-500/30 text-xs flex items-center space-x-1 cursor-pointer"
+              title="Type & Find Bowler or Create New Bowler"
+            >
+              <span>🔍/+</span>
+            </button>
           </div>
 
           {/* Undo / Redo */}
@@ -432,7 +661,7 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
           {!isSecondInnings && (
             <button
               onClick={onStartSecondInnings}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-3 py-1 rounded-lg shadow transition"
+              className="bg-gradient-to-r from-red-700 to-red-800 hover:from-red-600 hover:to-red-700 text-yellow-300 font-black px-3 py-1 rounded-lg shadow border border-yellow-500/40 transition"
             >
               Start 2nd Innings ➔
             </button>
@@ -441,25 +670,211 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
           {/* Modals Triggers */}
           <button
             onClick={() => setShowInterruptionModal(true)}
-            className="bg-slate-800 hover:bg-slate-700 text-blue-300 font-bold px-2.5 py-1 rounded-lg border border-slate-700"
+            className="bg-[#0a1226] hover:bg-[#121f42] text-white font-bold px-2.5 py-1 rounded-lg border border-yellow-500/30"
           >
             🌧️ Rain/DLS
           </button>
 
           <button
             onClick={() => setShowMediaModal(true)}
-            className="bg-slate-800 hover:bg-slate-700 text-purple-300 font-bold px-2.5 py-1 rounded-lg border border-slate-700"
+            className="bg-[#1c0810] hover:bg-[#2e0d1b] text-yellow-300 font-bold px-2.5 py-1 rounded-lg border border-yellow-500/30"
           >
             🎬 Media Stings
           </button>
 
           <button
             onClick={() => setShowScorecardModal(true)}
-            className="bg-slate-800 hover:bg-slate-700 text-yellow-300 font-bold px-2.5 py-1 rounded-lg border border-slate-700"
+            className="bg-[#0a1226] hover:bg-[#121f42] text-yellow-300 font-bold px-2.5 py-1 rounded-lg border border-yellow-500/30"
           >
             📊 Scorecard
           </button>
+
+          {/* Hotkey Cheatsheet */}
+          <button
+            onClick={() => setShowHotkeyModal(true)}
+            className="bg-[#0a1226] hover:bg-[#121f42] text-yellow-300 font-bold px-2.5 py-1 rounded-lg border border-yellow-500/30 flex items-center space-x-1"
+            title="Keyboard Shortcuts Cheatsheet (Press ? or H)"
+          >
+            <span>⌨️</span>
+            <span>Hotkeys [?]</span>
+          </button>
+
+          {/* Reset Match */}
+          {onResetMatch && (
+            <button
+              onClick={onResetMatch}
+              className="bg-[#1c0810] hover:bg-red-950 text-white hover:text-yellow-300 font-bold px-2.5 py-1 rounded-lg border border-red-800 hover:border-yellow-500/50 transition"
+              title="Reset live match"
+            >
+              🔄 Reset
+            </button>
+          )}
         </div>
+      </div>
+
+      {/* PROMINENT ACTIVE CREASE (BATTERS & BOWLER) SELECTOR STRIP */}
+      <div
+        className="px-3 sm:px-6 py-2 border-b flex flex-wrap items-center justify-between gap-2.5 text-xs"
+        style={{
+          background: 'rgba(5,9,20,0.96)',
+          borderColor: 'rgba(250,204,21,0.2)',
+        }}
+      >
+        
+        {/* Striker Card & Select */}
+        <div className="flex items-center space-x-2 bg-[#0a1228] border-2 border-yellow-400 rounded-2xl px-3 py-1.5 shadow-md">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black uppercase tracking-wider text-yellow-400 flex items-center justify-between">
+              <span className="flex items-center gap-1">
+                <span>🏏</span>
+                <span>Striker (Facing)</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setPlayerPickerConfig({ isOpen: true, mode: 'striker' })}
+                className="ml-2 text-[9px] bg-[#14224c] hover:bg-[#1f3575] text-yellow-300 px-1.5 py-0.2 rounded border border-yellow-500/30 font-bold"
+                title="Type & Find Striker or Create New Batter"
+              >
+                🔍/+
+              </button>
+            </span>
+            <div className="flex items-center space-x-2 mt-0.5">
+              {onChangeStriker ? (
+                <select
+                  value={currentInnings.strikerId}
+                  onChange={(e) => {
+                    if (e.target.value === '__FIND_OR_ADD_STRIKER__') {
+                      setPlayerPickerConfig({ isOpen: true, mode: 'striker' });
+                    } else {
+                      onChangeStriker(e.target.value);
+                    }
+                  }}
+                  className="bg-[#050914] text-white font-black text-xs px-2.5 py-1 rounded-xl border border-yellow-500/40 focus:outline-none focus:border-yellow-400 cursor-pointer"
+                  title="Choose or change current Striker"
+                >
+                  {playing11Batters.map((p) => {
+                    const stats = currentInnings.batterStats[p.id];
+                    const isOut = stats?.isOut;
+                    return (
+                      <option key={p.id} value={p.id} disabled={isOut}>
+                        {p.name} {p.id === currentInnings.strikerId ? '*' : ''} ({stats?.runs || 0} off {stats?.ballsFaced || 0}){isOut ? ' [OUT]' : ''}
+                      </option>
+                    );
+                  })}
+                  <option value="__FIND_OR_ADD_STRIKER__">➕ Type & Find / Create Batter...</option>
+                </select>
+              ) : (
+                <span className="font-extrabold text-white text-xs">{striker?.name || 'Striker'}*</span>
+              )}
+              <span className="text-yellow-300 font-mono font-bold text-xs">
+                {striker?.runs || 0} <span className="text-[10px] text-white/70">({striker?.ballsFaced || 0})</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Swap Ends Button */}
+        <button
+          onClick={onSwapStrikeManual}
+          title="Swap Strike (Key: S)"
+          className="bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black px-3.5 py-2 rounded-2xl border border-yellow-400 flex items-center space-x-1 shadow-md hover:scale-105 transition cursor-pointer"
+        >
+          <span className="text-base font-black">⇄</span>
+          <span className="text-xs font-black tracking-wider uppercase">Swap Strike</span>
+        </button>
+
+        {/* Non-Striker Card & Select */}
+        <div className="flex items-center space-x-2 bg-[#070e22] border border-yellow-500/30 rounded-2xl px-3 py-1.5 shadow">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-yellow-400 flex items-center justify-between">
+              <span className="flex items-center gap-1">
+                <span>🏃</span>
+                <span>Non-Striker (Runner)</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setPlayerPickerConfig({ isOpen: true, mode: 'nonStriker' })}
+                className="ml-2 text-[9px] bg-[#14224c] hover:bg-[#1f3575] text-yellow-300 px-1.5 py-0.2 rounded border border-yellow-500/30 font-bold"
+                title="Type & Find Non-Striker or Create New Batter"
+              >
+                🔍/+
+              </button>
+            </span>
+            <div className="flex items-center space-x-2 mt-0.5">
+              {onChangeNonStriker ? (
+                <select
+                  value={currentInnings.nonStrikerId}
+                  onChange={(e) => {
+                    if (e.target.value === '__FIND_OR_ADD_NON_STRIKER__') {
+                      setPlayerPickerConfig({ isOpen: true, mode: 'nonStriker' });
+                    } else {
+                      onChangeNonStriker(e.target.value);
+                    }
+                  }}
+                  className="bg-[#050914] text-white font-extrabold text-xs px-2.5 py-1 rounded-xl border border-yellow-500/30 focus:outline-none focus:border-yellow-400 cursor-pointer"
+                  title="Choose or change current Non-Striker"
+                >
+                  {playing11Batters.map((p) => {
+                    const stats = currentInnings.batterStats[p.id];
+                    const isOut = stats?.isOut;
+                    return (
+                      <option key={p.id} value={p.id} disabled={isOut}>
+                        {p.name} ({stats?.runs || 0} off {stats?.ballsFaced || 0}){isOut ? ' [OUT]' : ''}
+                      </option>
+                    );
+                  })}
+                  <option value="__FIND_OR_ADD_NON_STRIKER__">➕ Type & Find / Create Batter...</option>
+                </select>
+              ) : (
+                <span className="font-extrabold text-white text-xs">{nonStriker?.name || 'Non-Striker'}</span>
+              )}
+              <span className="text-yellow-300 font-mono font-bold text-xs">
+                {nonStriker?.runs || 0} <span className="text-[10px] text-white/70">({nonStriker?.ballsFaced || 0})</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bowler Card & Select (Dark Red Velvet with Gold Accents) */}
+        <div className="flex items-center space-x-2 bg-[#200408] border border-yellow-500/40 rounded-2xl px-3 py-1.5 shadow">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-yellow-400 flex items-center justify-between">
+              <span className="flex items-center gap-1">
+                <span>🎯</span>
+                <span>Current Bowler</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setPlayerPickerConfig({ isOpen: true, mode: 'bowler' })}
+                className="ml-2 text-[9px] bg-[#3b0b14] hover:bg-[#520f1c] text-yellow-300 px-1.5 py-0.2 rounded border border-yellow-500/40 font-bold"
+                title="Type & Find Bowler or Create New Bowler"
+              >
+                🔍 Find / + New
+              </button>
+            </span>
+            <div className="flex items-center space-x-2 mt-0.5">
+              <select
+                value={currentInnings.currentBowlerId}
+                onChange={(e) => {
+                  if (e.target.value === '__FIND_OR_ADD_BOWLER__') {
+                    setPlayerPickerConfig({ isOpen: true, mode: 'bowler' });
+                  } else {
+                    onChangeBowler(e.target.value);
+                  }
+                }}
+                className="bg-[#050914] text-yellow-300 font-extrabold text-xs px-2.5 py-1 rounded-xl border border-yellow-500/40 focus:outline-none focus:border-yellow-400 cursor-pointer"
+              >
+                {availableBowlers.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({currentInnings.bowlerStats[b.id]?.oversFormatted || '0.0'} / max {bowlerQuota.maxOversPerBowler} ov)
+                  </option>
+                ))}
+                <option value="__FIND_OR_ADD_BOWLER__">➕ Type & Find / Create Bowler...</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* MAIN COCKPIT BUTTONS BAR */}
@@ -524,7 +939,7 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
               Wide ▾
             </button>
             {showWideSubmenu && (
-              <div className="absolute top-14 left-0 w-36 bg-slate-900 border border-amber-500 rounded-xl shadow-2xl py-1 z-30">
+              <div className="absolute top-14 left-0 w-44 bg-slate-900 border border-amber-500 rounded-xl shadow-2xl py-1 z-30">
                 <button onClick={() => handleWide(0)} className="w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-amber-600 text-white">
                   Wide Only (+1)
                 </button>
@@ -539,6 +954,16 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
                 </button>
                 <button onClick={() => handleWide(4)} className="w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-amber-600 text-white">
                   Wide + 4 (Boundary)
+                </button>
+                <button onClick={() => handleWideStumped()} className="w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-red-600 text-yellow-300 border-t border-slate-800">
+                  ⚡ Wide + Stumped (WK)
+                </button>
+                <button
+                  onClick={() => openAdvancedExtras('wide')}
+                  className="w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-amber-600 text-yellow-300 border-t border-slate-800 flex items-center justify-between"
+                >
+                  <span>⚡ Custom / Wicket...</span>
+                  <span className="text-[10px] bg-amber-500/30 px-1 rounded text-amber-200">Law 22</span>
                 </button>
               </div>
             )}
@@ -573,6 +998,13 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
                 <button onClick={() => handleNoBall(0, 1)} className="w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-orange-600 text-white">
                   NB + 1 Bye (+2)
                 </button>
+                <button
+                  onClick={() => openAdvancedExtras('noball')}
+                  className="w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-orange-600 text-yellow-300 border-t border-slate-800 flex items-center justify-between"
+                >
+                  <span>⚡ Custom Bat/Byes/Wkt...</span>
+                  <span className="text-[10px] bg-orange-500/30 px-1 rounded text-orange-200">Law 21</span>
+                </button>
               </div>
             )}
           </div>
@@ -587,7 +1019,7 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
               Bye ▾
             </button>
             {showByesSubmenu && (
-              <div className="absolute top-14 left-0 w-28 bg-slate-900 border border-slate-600 rounded-xl shadow-2xl py-1 z-30">
+              <div className="absolute top-14 left-0 w-36 bg-slate-900 border border-slate-600 rounded-xl shadow-2xl py-1 z-30">
                 {[1, 2, 3, 4].map((r) => (
                   <button
                     key={r}
@@ -597,6 +1029,12 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
                     {r} Bye{r > 1 ? 's' : ''}
                   </button>
                 ))}
+                <button
+                  onClick={() => openAdvancedExtras('bye')}
+                  className="w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-blue-600 text-yellow-300 border-t border-slate-800"
+                >
+                  ⚡ Custom / Wicket...
+                </button>
               </div>
             )}
           </div>
@@ -611,7 +1049,7 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
               Lb ▾
             </button>
             {showLegByesSubmenu && (
-              <div className="absolute top-14 left-0 w-28 bg-slate-900 border border-slate-600 rounded-xl shadow-2xl py-1 z-30">
+              <div className="absolute top-14 left-0 w-36 bg-slate-900 border border-slate-600 rounded-xl shadow-2xl py-1 z-30">
                 {[1, 2, 3, 4].map((r) => (
                   <button
                     key={r}
@@ -621,6 +1059,12 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
                     {r} Leg-Bye{r > 1 ? 's' : ''}
                   </button>
                 ))}
+                <button
+                  onClick={() => openAdvancedExtras('leg_bye')}
+                  className="w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-indigo-600 text-yellow-300 border-t border-slate-800"
+                >
+                  ⚡ Custom / Wicket...
+                </button>
               </div>
             )}
           </div>
@@ -632,6 +1076,16 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
             title="+5 Penalty Runs [Key: P]"
           >
             +5 Pen
+          </button>
+
+          {/* Dedicated Custom Extra / Wicket Modal Trigger */}
+          <button
+            onClick={() => openAdvancedExtras('wide')}
+            className="flex-1 h-12 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 border border-amber-400 rounded-xl font-black text-xs text-yellow-200 transition shadow flex items-center justify-center space-x-1"
+            title="Open Advanced Extras & Compound Delivery Dialog (Wide, No-Ball, Byes, Compound Wickets)"
+          >
+            <span>⚡</span>
+            <span>Extra+Wkt</span>
           </button>
         </div>
 
@@ -680,6 +1134,15 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
                 <button onClick={() => handleWicket('obstructing_field')} className="w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-red-600 text-white">
                   Obstructing Field
                 </button>
+                <button onClick={() => handleWicket('hit_ball_twice')} className="w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-red-600 text-white">
+                  Hit Ball Twice
+                </button>
+                <button onClick={() => handleWicket('handling_ball')} className="w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-red-600 text-white">
+                  Handled The Ball
+                </button>
+                <button onClick={() => handleWicket('timed_out')} className="w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-red-600 text-white">
+                  Timed Out
+                </button>
                 <button onClick={() => handleWicket('retired_out')} className="w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-red-600 text-white">
                   Retired Out
                 </button>
@@ -703,14 +1166,90 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
       </div>
 
       {/* POPUP MODALS */}
+      {showWicketModal && pendingDismissalType && (
+        <WicketModal
+          isOpen={showWicketModal}
+          dismissalType={pendingDismissalType}
+          striker={striker ? { id: striker.playerId, name: striker.name, role: 'batsman' } : { id: 's', name: 'Striker', role: 'batsman' }}
+          nonStriker={nonStriker ? { id: nonStriker.playerId, name: nonStriker.name, role: 'batsman' } : { id: 'ns', name: 'Non-Striker', role: 'batsman' }}
+          availableBatters={availableBatters}
+          bowlerName={currentInnings.bowlerStats[currentInnings.currentBowlerId]?.name || 'Bowler'}
+          battingTeam={battingTeam}
+          fieldingTeam={bowlingTeam}
+          onAddNewBatter={(tId, p) => {
+            if (onAddPlayerToTeam) {
+              onAddPlayerToTeam(tId, p, 'nextBatter');
+            }
+          }}
+          onConfirm={handleConfirmWicketModal}
+          onClose={() => setShowWicketModal(false)}
+        />
+      )}
+
+      {/* Live Match Player Picker (Type & Find + Create New) */}
+      {playerPickerConfig?.isOpen && (
+        <LivePlayerPickerModal
+          isOpen={playerPickerConfig.isOpen}
+          mode={playerPickerConfig.mode}
+          team={playerPickerConfig.mode === 'bowler' ? bowlingTeam : battingTeam}
+          currentSelectedId={
+            playerPickerConfig.mode === 'bowler'
+              ? currentInnings.currentBowlerId
+              : playerPickerConfig.mode === 'striker'
+              ? currentInnings.strikerId
+              : currentInnings.nonStrikerId
+          }
+          onSelectPlayer={(id) => {
+            if (playerPickerConfig.mode === 'bowler') {
+              onChangeBowler(id);
+            } else if (playerPickerConfig.mode === 'striker' && onChangeStriker) {
+              onChangeStriker(id);
+            } else if (playerPickerConfig.mode === 'nonStriker' && onChangeNonStriker) {
+              onChangeNonStriker(id);
+            }
+          }}
+          onAddNewPlayer={(tId, p, asMode) => {
+            if (onAddPlayerToTeam) {
+              onAddPlayerToTeam(tId, p, asMode);
+            }
+          }}
+          onClose={() => setPlayerPickerConfig(null)}
+          bowlerStats={currentInnings.bowlerStats}
+          batterStats={currentInnings.batterStats}
+          maxOversPerBowler={bowlerQuota.maxOversPerBowler}
+          excludePlayerIds={
+            playerPickerConfig.mode === 'striker'
+              ? [currentInnings.nonStrikerId]
+              : playerPickerConfig.mode === 'nonStriker'
+              ? [currentInnings.strikerId]
+              : []
+          }
+        />
+      )}
+
       {showRunOutModal && (
         <RunOutModal
           isOpen={showRunOutModal}
           striker={striker ? { id: striker.playerId, name: striker.name, role: 'batsman' } : { id: 's', name: 'Striker', role: 'batsman' }}
           nonStriker={nonStriker ? { id: nonStriker.playerId, name: nonStriker.name, role: 'batsman' } : { id: 'ns', name: 'Non-Striker', role: 'batsman' }}
           availableBatters={availableBatters}
+          fieldingTeam={bowlingTeam}
           onConfirm={handleConfirmRunOut}
           onClose={() => setShowRunOutModal(false)}
+        />
+      )}
+
+      {showAdvancedExtrasModal && (
+        <AdvancedExtrasModal
+          isOpen={showAdvancedExtrasModal}
+          initialExtraType={advancedExtraInitialType}
+          striker={striker ? { id: striker.playerId, name: striker.name, role: 'batsman' } : { id: 's', name: 'Striker', role: 'batsman' }}
+          nonStriker={nonStriker ? { id: nonStriker.playerId, name: nonStriker.name, role: 'batsman' } : { id: 'ns', name: 'Non-Striker', role: 'batsman' }}
+          availableBatters={availableBatters}
+          bowlerName={currentInnings.bowlerStats[currentInnings.currentBowlerId]?.name || 'Bowler'}
+          isFreeHitActive={currentInnings.isFreeHitActive}
+          onConfirm={handleConfirmAdvancedExtra}
+          onClose={() => setShowAdvancedExtrasModal(false)}
         />
       )}
 
@@ -754,6 +1293,13 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
           innings={currentInnings}
           metadata={match.metadata}
           onClose={() => setShowScorecardModal(false)}
+        />
+      )}
+
+      {showHotkeyModal && (
+        <HotkeyModal
+          isOpen={showHotkeyModal}
+          onClose={() => setShowHotkeyModal(false)}
         />
       )}
     </div>

@@ -238,7 +238,11 @@ export function reduceBallDelivery(
     // If byes or legbyes occurred on no-ball
     const extraByesOnNb = delivery.runsExtras - 1;
     if (extraByesOnNb > 0) {
-      nextExtras.byes += extraByesOnNb;
+      if (delivery.extraSubType === 'leg_bye') {
+        nextExtras.legByes += extraByesOnNb;
+      } else {
+        nextExtras.byes += extraByesOnNb;
+      }
       nextExtras.total += extraByesOnNb;
     }
   } else if (delivery.extraType === 'bye') {
@@ -250,11 +254,12 @@ export function reduceBallDelivery(
     nextExtras.total += delivery.runsExtras;
     // Leg-byes are NOT charged to bowler!
   } else if (delivery.extraType === 'penalty') {
+    // MCC Law 41 & 42: Only batting penalties are added to batting team's extras
     if (delivery.penalty?.teamBenefited === 'batting') {
       nextExtras.penalties += delivery.runsExtras;
       nextExtras.total += delivery.runsExtras;
     }
-    // Penalty runs are NOT charged to bowler!
+    // Penalty runs are NEVER charged to bowler!
   } else {
     // Normal ball off bat
     bowler.runsConceded += delivery.runsBat;
@@ -275,9 +280,13 @@ export function reduceBallDelivery(
     : 0;
 
   // 3. Bowler stats calculation for legal delivery
+  // If the previous over just completed (6 legal balls), reset recent balls for the new over
+  let nextRecentBalls = (state.currentOverLegalBalls === 0 && state.legalBalls > 0 && state.deliveries.length > 0)
+    ? []
+    : [...state.recentBalls];
+
   let nextLegalBalls = state.legalBalls;
   let nextCurrentOverLegalBalls = state.currentOverLegalBalls;
-  let nextRecentBalls = [...state.recentBalls];
 
   if (delivery.legalBallCounted) {
     nextLegalBalls += 1;
@@ -300,12 +309,19 @@ export function reduceBallDelivery(
   nextRecentBalls.push(delivery);
 
   // 4. Team total runs calculation
-  // Total runs = runs off bat + all extras
-  const deliveryTotalRuns = (delivery.runsBat || 0) + (delivery.runsExtras || 0);
-  const nextTotalRuns = state.totalRuns + deliveryTotalRuns;
+  // MCC Law 41 & 42: Fielding penalties do NOT add to batting innings total!
+  let deliveryBattingRuns = delivery.runsBat || 0;
+  if (delivery.extraType === 'penalty') {
+    if (delivery.penalty?.teamBenefited === 'batting') {
+      deliveryBattingRuns += (delivery.runsExtras || 0);
+    }
+  } else {
+    deliveryBattingRuns += (delivery.runsExtras || 0);
+  }
+  const nextTotalRuns = state.totalRuns + deliveryBattingRuns;
 
-  // 5. Partnership update
-  nextPartnership.runs += deliveryTotalRuns;
+  // 5. Partnership update (only batting runs add to partnership)
+  nextPartnership.runs += deliveryBattingRuns;
   if (delivery.legalBallCounted || delivery.extraType === 'noball') {
     nextPartnership.balls += 1;
   }
@@ -315,18 +331,36 @@ export function reduceBallDelivery(
     nextPartnership.batter2Runs += delivery.runsBat;
   }
 
-  // 6. Wicket handling
+  // 6. Free Hit & Wicket handling (ICC Law 21.19)
+  // On a Free Hit, only run_out, obstructing_field, hit_ball_twice, handling_ball, timed_out are legal dismissals
+  const isFreeHit = delivery.isFreeHitDelivery || state.isFreeHitActive;
+  const isIllegalFreeHitDismissal = isFreeHit && delivery.wicket && ![
+    'run_out',
+    'obstructing_field',
+    'hit_ball_twice',
+    'handling_ball',
+    'timed_out',
+  ].includes(delivery.wicket.type);
+
+  const effectiveWicket = isIllegalFreeHitDismissal ? undefined : delivery.wicket;
+
   let nextTotalWickets = state.totalWickets;
-  if (delivery.wicket) {
-    const w = delivery.wicket;
+  if (effectiveWicket) {
+    const w = effectiveWicket;
     const dismissedBatter = nextBatterStats[w.playerOutId];
     if (dismissedBatter) {
-      dismissedBatter.isOut = true;
-      dismissedBatter.dismissalDescription = formatDismissalText(
-        w.type,
-        bowler.name,
-        w.assistedById ? playerNames[w.assistedById] : undefined
-      );
+      // MCC Law: Retired hurt is NOT out (retired not out)
+      if (w.type === 'retired_hurt') {
+        dismissedBatter.isOut = false;
+        dismissedBatter.dismissalDescription = 'retired hurt';
+      } else {
+        dismissedBatter.isOut = true;
+        dismissedBatter.dismissalDescription = formatDismissalText(
+          w.type,
+          bowler.name,
+          w.assistedById ? (playerNames[w.assistedById] || w.assistedById) : undefined
+        );
+      }
     }
 
     // Bowler credit
@@ -362,10 +396,10 @@ export function reduceBallDelivery(
   const physicalRuns = delivery.physicalRunsRan || 0;
   const shouldRotatePhysical = physicalRuns % 2 !== 0;
 
-  if (delivery.wicket) {
+  if (effectiveWicket) {
     // If wicket fell, determine who is at striker end
-    const playerOutId = delivery.wicket.playerOutId;
-    const newBatterId = delivery.wicket.newBatterId;
+    const playerOutId = effectiveWicket.playerOutId;
+    const newBatterId = effectiveWicket.newBatterId;
 
     if (playerOutId === nextStrikerId) {
       // Striker was dismissed
@@ -399,12 +433,14 @@ export function reduceBallDelivery(
   // 8. End of Over Handling
   // When 6 legal balls have completed the over:
   if (nextCurrentOverLegalBalls >= 6) {
-    // Check if over was a maiden (0 runs conceded in this over)
+    // Check if over was a maiden (0 runs conceded by bowler in this over)
     const overDeliveries = nextRecentBalls;
     const runsConcededInOver = overDeliveries.reduce((sum, d) => {
       let runs = d.runsBat;
-      if (d.extraType === 'wide' || d.extraType === 'noball') {
+      if (d.extraType === 'wide') {
         runs += d.runsExtras;
+      } else if (d.extraType === 'noball') {
+        runs += 1; // Bowler concedes 1 NB penalty + runsBat (already in d.runsBat)
       }
       return sum + runs;
     }, 0);
@@ -412,9 +448,11 @@ export function reduceBallDelivery(
       bowler.maidens += 1;
     }
 
-    // Reset current over legal balls and recent balls
+    // Reset current over legal balls to 0 for next over.
+    // NOTE: We KEEP nextRecentBalls populated with this completed over so that
+    // the 6th delivery remains docked in the broadcast ticker until the first ball
+    // of the next over is bowled!
     nextCurrentOverLegalBalls = 0;
-    nextRecentBalls = [];
 
     // Switch ends for the new over: striker and non-striker swap!
     const temp = nextStrikerId;

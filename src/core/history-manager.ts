@@ -9,11 +9,20 @@ export class InningsHistoryManager {
   private redoStack: BallDeliveryEvent[];
   private playerNames: Record<string, string>;
 
-  constructor(initialState: InningsState, playerNames: Record<string, string> = {}) {
+  constructor(
+    initialState: InningsState,
+    playerNames: Record<string, string> = {},
+    deliveries?: BallDeliveryEvent[],
+    redoStack?: BallDeliveryEvent[]
+  ) {
     this.initialState = initialState;
-    this.deliveries = [...initialState.deliveries];
-    this.redoStack = [];
+    this.deliveries = deliveries ? [...deliveries] : [...initialState.deliveries];
+    this.redoStack = redoStack ? [...redoStack] : [];
     this.playerNames = playerNames;
+  }
+
+  public updatePlayerNames(names: Record<string, string>): void {
+    this.playerNames = { ...this.playerNames, ...names };
   }
 
   /**
@@ -65,6 +74,13 @@ export class InningsHistoryManager {
    */
   public getDeliveries(): BallDeliveryEvent[] {
     return [...this.deliveries];
+  }
+
+  /**
+   * Get the current redo stack
+   */
+  public getRedoStack(): BallDeliveryEvent[] {
+    return [...this.redoStack];
   }
 
   /**

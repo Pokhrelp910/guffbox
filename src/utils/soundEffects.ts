@@ -173,6 +173,257 @@ class StadiumSoundSynthesizer {
       console.warn('Audio error:', e);
     }
   }
+
+  // ═════════════════════════════════════════════════════════════
+  // ─── AMBIENT CONTINUOUS STADIUM CROWD ENGINE ───
+  // ═════════════════════════════════════════════════════════════
+
+  private ambientNode: AudioBufferSourceNode | null = null;
+  private ambientGain: GainNode | null = null;
+  private ambientLfo: OscillatorNode | null = null;
+  private isAmbientPlaying: boolean = false;
+
+  public startAmbientCrowd(volume: number = 0.12) {
+    if (this.isAmbientPlaying) {
+      this.setAmbientVolume(volume);
+      return;
+    }
+
+    try {
+      const ctx = this.getContext();
+      // Generate 4-second seamless looping pinkish crowd murmur noise
+      const bufferSize = ctx.sampleRate * 4;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      let b0 = 0, b1 = 0, b2 = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        data[i] = (b0 + b1 + b2) * 0.18;
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      noise.loop = true;
+
+      // Bandpass filter to simulate human voices & stadium reverberation
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(650, ctx.currentTime);
+      filter.Q.setValueAtTime(1.2, ctx.currentTime);
+
+      // Low frequency oscillator for natural swell
+      const lfo = ctx.createOscillator();
+      const lfoGain = ctx.createGain();
+      lfo.frequency.setValueAtTime(0.25, ctx.currentTime); // 4-second gentle swell
+      lfoGain.gain.setValueAtTime(0.04, ctx.currentTime);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(Math.max(0.01, Math.min(1, volume)), ctx.currentTime);
+
+      lfo.connect(lfoGain);
+      lfoGain.connect(gain.gain);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      noise.start();
+      lfo.start();
+
+      this.ambientNode = noise;
+      this.ambientGain = gain;
+      this.ambientLfo = lfo;
+      this.isAmbientPlaying = true;
+    } catch (e) {
+      console.warn('Ambient crowd start error:', e);
+    }
+  }
+
+  public stopAmbientCrowd() {
+    if (!this.isAmbientPlaying) return;
+    try {
+      if (this.ambientGain && this.ctx) {
+        this.ambientGain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.5);
+      }
+      setTimeout(() => {
+        try {
+          this.ambientNode?.stop();
+          this.ambientLfo?.stop();
+          this.ambientNode?.disconnect();
+          this.ambientGain?.disconnect();
+          this.ambientLfo?.disconnect();
+        } catch {
+          // ignore cleanup errors
+        }
+        this.ambientNode = null;
+        this.ambientGain = null;
+        this.ambientLfo = null;
+        this.isAmbientPlaying = false;
+      }, 550);
+    } catch (e) {
+      console.warn('Ambient stop error:', e);
+      this.isAmbientPlaying = false;
+    }
+  }
+
+  public isAmbientCrowdActive(): boolean {
+    return this.isAmbientPlaying;
+  }
+
+  public setAmbientVolume(volume: number) {
+    if (this.ambientGain && this.ctx) {
+      this.ambientGain.gain.setValueAtTime(Math.max(0.01, Math.min(1, volume)), this.ctx.currentTime);
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════
+  // ─── BROADCAST SOUNDBOARD SPECIAL EFFECTS ───
+  // ═════════════════════════════════════════════════════════════
+
+  // Roaring crowd cheer & applause
+  public playCrowdCheer() {
+    try {
+      const ctx = this.getContext();
+      const bufferSize = ctx.sampleRate * 2.5;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.4;
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(900, ctx.currentTime);
+      filter.frequency.linearRampToValueAtTime(1400, ctx.currentTime + 0.8);
+      filter.frequency.linearRampToValueAtTime(800, ctx.currentTime + 2.4);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 0.4);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2.5);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      noise.start();
+      noise.stop(ctx.currentTime + 2.5);
+    } catch (e) {
+      console.warn('Cheer sound error:', e);
+    }
+  }
+
+  // Stadium Airhorn / Trumpet Anthem (ta-ta-ta-ta-ta-ta DHOOM!)
+  public playAirhorn() {
+    try {
+      const ctx = this.getContext();
+      // Notes pattern: G4, G4, G4, G4, G4, C5
+      const notes = [
+        { f: 392.00, t: 0.00, d: 0.12 },
+        { f: 392.00, t: 0.14, d: 0.12 },
+        { f: 392.00, t: 0.28, d: 0.12 },
+        { f: 392.00, t: 0.44, d: 0.15 },
+        { f: 392.00, t: 0.62, d: 0.15 },
+        { f: 523.25, t: 0.80, d: 0.60 }, // Climax high C5
+      ];
+
+      notes.forEach((n) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(n.f, ctx.currentTime + n.t);
+
+        gain.gain.setValueAtTime(0, ctx.currentTime + n.t);
+        gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + n.t + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + n.t + n.d);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + n.t);
+        osc.stop(ctx.currentTime + n.t + n.d + 0.05);
+      });
+    } catch (e) {
+      console.warn('Airhorn error:', e);
+    }
+  }
+
+  // Crowd Appeal "HOWZAT!" Surge
+  public playAppeal() {
+    try {
+      const ctx = this.getContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(180, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(550, ctx.currentTime + 0.3);
+      osc.frequency.linearRampToValueAtTime(300, ctx.currentTime + 0.8);
+
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.25);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.9);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.95);
+    } catch (e) {
+      console.warn('Appeal error:', e);
+    }
+  }
+
+  // Rhythmic Stadium Hand Claps (Clap... Clap... Clap-Clap-Clap!)
+  public playClapping() {
+    try {
+      const ctx = this.getContext();
+      const clapTimes = [0.0, 0.4, 0.8, 1.0, 1.2, 1.4];
+      clapTimes.forEach((t) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(400, ctx.currentTime + t);
+        osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + t + 0.08);
+
+        gain.gain.setValueAtTime(0.4, ctx.currentTime + t);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.09);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + t);
+        osc.stop(ctx.currentTime + t + 0.1);
+      });
+    } catch (e) {
+      console.warn('Clap error:', e);
+    }
+  }
+
+  // Sharp Umpire / Referee Whistle
+  public playWhistle() {
+    try {
+      const ctx = this.getContext();
+      [2400, 2450].forEach((freq) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.38);
+      });
+    } catch (e) {
+      console.warn('Whistle error:', e);
+    }
+  }
 }
 
 export const stadiumAudio = new StadiumSoundSynthesizer();
