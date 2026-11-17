@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Target, Run Rates & Curtailed Overs Calculator
+// The Cricket Guff Studio — Target, Run Rates & Curtailed Overs Calculator
 
 export interface TargetCalculationResult {
   currentRunRate: number;

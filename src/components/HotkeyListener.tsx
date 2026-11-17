@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Hotkey Shortcuts Listener
+// The Cricket Guff Studio — Hotkey Shortcuts Listener
 
 import { useEffect } from 'react';
 

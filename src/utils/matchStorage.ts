@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Match State Persistence & Autosave Engine
+// The Cricket Guff Studio — Match State Persistence & Autosave Engine
 
 import { MatchState, InningsState, BallDeliveryEvent } from '../core/types';
 

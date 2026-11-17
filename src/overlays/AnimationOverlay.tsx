@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Premium Star Sports Motion Graphics Overlay v2.0
+// The Cricket Guff Studio — Premium Star Sports Motion Graphics Overlay v2.0
 
 import React, { useState, useEffect, useRef } from 'react';
 import { MediaEventKey } from '../core/types';

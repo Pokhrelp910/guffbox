@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Premium TV Broadcast Full Scoreboard v2.0
+// The Cricket Guff Studio — Premium TV Broadcast Full Scoreboard v2.0
 
 import React, { useEffect } from 'react';
 import { InningsState, Team, MatchMetadata } from '../core/types';

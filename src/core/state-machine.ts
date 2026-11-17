@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — MCC Cricket State Reducer & Core Engine
+// The Cricket Guff Studio — MCC Cricket State Reducer & Core Engine
 
 import {
   InningsState,

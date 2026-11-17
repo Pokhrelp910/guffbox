@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — MCC Law 41 & 42 Penalty Runs Engine
+// The Cricket Guff Studio — MCC Law 41 & 42 Penalty Runs Engine
 
 import { MatchState, BallDeliveryEvent } from './types';
 

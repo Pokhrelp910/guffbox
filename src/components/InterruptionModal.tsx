@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Rain, Curtailed Overs & DLS Revision Modal
+// The Cricket Guff Studio — Rain, Curtailed Overs & DLS Revision Modal
 
 import React, { useState } from 'react';
 import { calculateCurtailedOversQuota } from '../core/target-calculator';

@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Single-Monitor Scorer HUD Cockpit
+// The Cricket Guff Studio — Single-Monitor Scorer HUD Cockpit
 
 import React, { useState } from 'react';
 import {
@@ -564,7 +564,7 @@ export const ScorerHUD: React.FC<ScorerHUDProps> = ({
       >
         <div className="flex items-center space-x-3">
           <span className="font-extrabold text-yellow-400 font-['Teko'] text-lg tracking-wider">
-            GUFFBOX COCKPIT
+            THE CRICKET GUFF COCKPIT
           </span>
           <span className="bg-blue-950/90 text-white border border-yellow-500/30 px-2 py-0.5 rounded font-mono">
             Innings {match.currentInningsNumber} • <span className="text-yellow-400 font-bold">{battingTeam.shortName}</span> vs <span className="text-white">{bowlingTeam.shortName}</span>

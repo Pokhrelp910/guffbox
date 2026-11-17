@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Penalty Runs Modal (MCC Law 41 & 42)
+// The Cricket Guff Studio — Penalty Runs Modal (MCC Law 41 & 42)
 
 import React, { useState } from 'react';
 

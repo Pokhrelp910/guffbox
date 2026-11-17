@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Wicket Dismissal & Incoming Batter Selector Modal
+// The Cricket Guff Studio — Wicket Dismissal & Incoming Batter Selector Modal
 // Enhanced with mid-match Type & Find and dynamic new batter creation with cartoon avatars
 
 import React, { useState, useMemo, useEffect } from 'react';

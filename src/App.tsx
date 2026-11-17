@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Master Application & Broadcast Orchestrator
+// The Cricket Guff Studio — Master Application & Broadcast Orchestrator
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -844,11 +844,11 @@ export const App: React.FC = () => {
       <header className="bg-gradient-to-r from-[#0b1739] via-[#070e24] to-[#260810] border-b border-yellow-500/20 px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center space-x-3">
           <div className="w-9 h-9 rounded-xl bg-yellow-400 flex items-center justify-center font-black text-[#050a18] font-['Teko'] text-2xl shadow-lg">
-            GB
+            TCG
           </div>
           <div>
             <h1 className="text-lg font-black tracking-wider text-yellow-400 font-['Teko']">
-              GUFFBOX CRICKET STUDIO
+              THE CRICKET GUFF STUDIO
             </h1>
             <p className="text-[11px] text-white/80 -mt-1 font-medium">
               Elite Broadcast Scoring Cockpit & YouTube Stream Engine
@@ -1208,7 +1208,7 @@ export const App: React.FC = () => {
 
       {/* Floating Movable Circular Camera Widget (Bottom Right) */}
       <MovableCircularCam
-        streamerName="GUFFBOX LIVE"
+        streamerName="THE CRICKET GUFF LIVE"
         isVisible={showCamWidget}
         onClose={() => setShowCamWidget(false)}
       />

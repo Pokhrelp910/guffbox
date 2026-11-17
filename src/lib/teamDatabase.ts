@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Master Team & Player Database Repository
+// The Cricket Guff Studio — Master Team & Player Database Repository
 // Persistent Master Data Engine with Supabase Sync & Duplicate Protection
 
 import { Team, Player } from '../core/types';

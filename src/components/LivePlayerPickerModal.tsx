@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Live Match Player Search & Dynamic Creator Modal
+// The Cricket Guff Studio — Live Match Player Search & Dynamic Creator Modal
 // Allows scorers to "Type & Find" bowlers/batters mid-match, or create brand new players on the fly with cartoon avatars
 
 import React, { useState } from 'react';

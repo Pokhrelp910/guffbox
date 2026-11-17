@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Premium YouTube Watchalong Live Broadcast Studio (1080p 16:9)
+// The Cricket Guff Studio — Premium YouTube Watchalong Live Broadcast Studio (1080p 16:9)
 // Designed specifically for YouTube Live Streamers, Cricket Watchalongs, and Commentary Shows.
 
 import React, { useState, useEffect } from 'react';
@@ -25,9 +25,9 @@ export const WatchalongStudio: React.FC<WatchalongStudioProps> = ({ match }) => 
   const [showStreamScorecard, setShowStreamScorecard] = useState<boolean>(false);
   const [streamPresentationCard, setStreamPresentationCard] = useState<PresentationCardType>('none');
   const [showStreamWagonWheel, setShowStreamWagonWheel] = useState<boolean>(false);
-  const [streamerName, setStreamerName] = useState<string>('GUFFBOX CRICKET LIVE');
+  const [streamerName, setStreamerName] = useState<string>('THE CRICKET GUFF LIVE');
   const [isEditingStreamer, setIsEditingStreamer] = useState<boolean>(false);
-  const [sponsorTicker, setSponsorTicker] = useState<string>('🏆 ICC T20 Championship • Official Broadcast • GuffBox Cricket Studio • Comment your match predictions live!');
+  const [sponsorTicker, setSponsorTicker] = useState<string>('🏆 ICC T20 Championship • Official Broadcast • The Cricket Guff Studio • Comment your match predictions live!');
   const [isEditingSponsor, setIsEditingSponsor] = useState<boolean>(false);
   const [centerTab, setCenterTab] = useState<'commentary' | 'manhattan' | 'worm'>('commentary');
   const [streamPoll, setStreamPoll] = useState<StreamPollData>({

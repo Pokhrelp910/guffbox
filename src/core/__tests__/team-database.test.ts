@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Unit Tests for Master Team & Player Database Repository
+// The Cricket Guff Studio — Unit Tests for Master Team & Player Database Repository
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {

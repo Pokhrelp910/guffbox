@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Premium Broadcast Header Infographics Drawer v2.0
+// The Cricket Guff Studio — Premium Broadcast Header Infographics Drawer v2.0
 
 import React from 'react';
 import { Partnership, InningsState, Team } from '../core/types';

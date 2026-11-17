@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — TV Broadcast Presentation Cards Suite
+// The Cricket Guff Studio — TV Broadcast Presentation Cards Suite
 // Features: Toss Presentation, Playing XI Lineup, Innings Break Summary, and Match Victory Card
 
 import React from 'react';
@@ -355,7 +355,7 @@ export const BroadcastCards: React.FC<BroadcastCardsProps> = ({
             </div>
 
             <div className="text-xs text-white/80 font-medium">
-              Thank you for watching GuffBox Cricket Live Broadcast! 🏏
+              Thank you for watching The Cricket Guff Live Broadcast! 🏏
             </div>
           </div>
         )}

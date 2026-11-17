@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — History Manager (Undo / Redo / Ball Editing)
+// The Cricket Guff Studio — History Manager (Undo / Redo / Ball Editing)
 
 import { InningsState, BallDeliveryEvent } from './types';
 import { recalculateInnings } from './state-machine';

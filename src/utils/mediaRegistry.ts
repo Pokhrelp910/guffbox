@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Granular 30+ Event Video & Media Registry with IndexedDB Permanent Storage
+// The Cricket Guff Studio — Granular 30+ Event Video & Media Registry with IndexedDB Permanent Storage
 
 import { MediaEventKey } from '../core/types';
 

@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Keyboard Shortcuts Cheatsheet Modal
+// The Cricket Guff Studio — Keyboard Shortcuts Cheatsheet Modal
 
 import React from 'react';
 import { Keyboard, X } from 'lucide-react';

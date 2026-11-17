@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Cartoon Avatar & Team Logo Utility Engine
+// The Cricket Guff Studio — Cartoon Avatar & Team Logo Utility Engine
 // Provides high-contrast, broadcast-ready default cartoon avatars for players and crest logos for teams
 
 import React, { useState, useEffect } from 'react';

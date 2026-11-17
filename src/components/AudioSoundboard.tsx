@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Live Stadium Audio Engine & Broadcaster Soundboard
+// The Cricket Guff Studio — Live Stadium Audio Engine & Broadcaster Soundboard
 
 import React, { useState } from 'react';
 import { stadiumAudio } from '../utils/soundEffects';

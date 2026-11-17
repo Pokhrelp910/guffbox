@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Premium TV Broadcast Wagon Wheel & Pitch Map Suite
+// The Cricket Guff Studio — Premium TV Broadcast Wagon Wheel & Pitch Map Suite
 
 import React, { useState } from 'react';
 import { InningsState, Team } from '../core/types';

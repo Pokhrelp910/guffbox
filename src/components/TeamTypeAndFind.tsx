@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Type & Find Team Autocomplete & Combobox
+// The Cricket Guff Studio — Type & Find Team Autocomplete & Combobox
 // Seamless lookup from Master Database with Instant "Create New Team" & Duplicate Detection
 
 import React, { useState, useEffect, useRef } from 'react';

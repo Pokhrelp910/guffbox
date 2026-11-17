@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Pre-Match Setup, Squads & Toss Engine
+// The Cricket Guff Studio — Pre-Match Setup, Squads & Toss Engine
 
 import React, { useState, useEffect } from 'react';
 import { Team, Player, TossInfo, MatchMetadata, MatchState } from '../core/types';

@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Star Sports Premium Broadcast Lower-Third Ticker v2.0
+// The Cricket Guff Studio — Star Sports Premium Broadcast Lower-Third Ticker v2.0
 
 import React from 'react';
 import { InningsState, Team, MatchMetadata, BallDeliveryEvent } from '../core/types';

@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Supabase Cloud Sync & 6-Day TTL Purge Engine
+// The Cricket Guff Studio — Supabase Cloud Sync & 6-Day TTL Purge Engine
 import { createClient } from '@supabase/supabase-js';
 import { MatchState, Team } from '../core/types';
 

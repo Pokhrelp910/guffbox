@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Supabase Cloud Connectivity & Table Verification Test
+// The Cricket Guff Studio — Supabase Cloud Connectivity & Table Verification Test
 
 import { describe, it, expect } from 'vitest';
 import { supabase, syncMatchToSupabase, fetchMatchFromSupabase, syncTeamToSupabase } from '../../lib/supabase';

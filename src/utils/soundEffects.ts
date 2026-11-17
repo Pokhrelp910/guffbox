@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Web Audio API Stadium Sound Synthesizer
+// The Cricket Guff Studio — Web Audio API Stadium Sound Synthesizer
 
 class StadiumSoundSynthesizer {
   private ctx: AudioContext | null = null;

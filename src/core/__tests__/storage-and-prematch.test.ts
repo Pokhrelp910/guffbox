@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Unit Tests for Media Registry, Match Storage & Pre-Match Logic
+// The Cricket Guff Studio — Unit Tests for Media Registry, Match Storage & Pre-Match Logic
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mediaRegistry, DEFAULT_MEDIA_SLOTS } from '../../utils/mediaRegistry';

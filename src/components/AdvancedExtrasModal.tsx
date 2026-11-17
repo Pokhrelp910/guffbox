@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Advanced Extras & Compound Delivery Modal (MCC Laws 21, 22, 23 & 38)
+// The Cricket Guff Studio — Advanced Extras & Compound Delivery Modal (MCC Laws 21, 22, 23 & 38)
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {

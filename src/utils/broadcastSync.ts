@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Real-time Broadcast Sync Engine
+// The Cricket Guff Studio — Real-time Broadcast Sync Engine
 // Synchronizes match state, stings/animations, and director toggles across Scorer Cockpit, OBS Overlay, and YouTube Watchalong screens.
 
 import { MatchState, MediaEventKey, InningsState } from '../core/types';

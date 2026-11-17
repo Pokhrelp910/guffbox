@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Wagon Wheel & Pitch Map Geometry Engine
+// The Cricket Guff Studio — Wagon Wheel & Pitch Map Geometry Engine
 
 import { BallDeliveryEvent, CricketShotZone, CricketPitchLength } from '../core/types';
 

@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Social Media Match Summary Graphic & PNG Exporter
+// The Cricket Guff Studio — Social Media Match Summary Graphic & PNG Exporter
 // Renders an esports-grade match summary card with instant 1080p PNG image download for social media
 
 import React, { useRef } from 'react';
@@ -199,7 +199,7 @@ export const SocialScorecardCard: React.FC<SocialScorecardCardProps> = ({
 
     ctx.fillStyle = 'rgba(255,255,255,0.7)';
     ctx.font = '14px sans-serif';
-    ctx.fillText('GUFFBOX CRICKET STUDIO • OFFICIAL BROADCAST SCORECARD', 600, 615);
+    ctx.fillText('THE CRICKET GUFF STUDIO • OFFICIAL BROADCAST SCORECARD', 600, 615);
 
     // Trigger instant download
     const dataUrl = canvas.toDataURL('image/png');

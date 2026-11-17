@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Live YouTube Stream Audience Poll & Prediction Widget
+// The Cricket Guff Studio — Live YouTube Stream Audience Poll & Prediction Widget
 // Provides an esports-grade live viewer prediction bar and direct Stream Director controller
 
 import React, { useState } from 'react';

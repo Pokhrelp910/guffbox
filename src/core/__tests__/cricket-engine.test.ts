@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Comprehensive Unit Test Suite
+// The Cricket Guff Studio — Comprehensive Unit Test Suite
 import { describe, it, expect } from 'vitest';
 import {
   createInitialInningsState,

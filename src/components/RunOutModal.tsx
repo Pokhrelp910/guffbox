@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — 1-Click Run Out Selector
+// The Cricket Guff Studio — 1-Click Run Out Selector
 
 import React, { useState, useMemo } from 'react';
 import { Player, Team } from '../core/types';

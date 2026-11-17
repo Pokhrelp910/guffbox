@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Unit Tests for Wagon Wheel Geometry & Broadcast Message Sync
+// The Cricket Guff Studio — Unit Tests for Wagon Wheel Geometry & Broadcast Message Sync
 
 import { describe, it, expect } from 'vitest';
 import {

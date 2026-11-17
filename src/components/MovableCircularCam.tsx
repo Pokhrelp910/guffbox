@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Movable Circular Facecam / Host PiP Widget
+// The Cricket Guff Studio — Movable Circular Facecam / Host PiP Widget
 // Floating, draggable circular live camera anchor positioned by default in the right-bottom corner
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -11,7 +11,7 @@ interface MovableCircularCamProps {
 }
 
 export const MovableCircularCam: React.FC<MovableCircularCamProps> = ({
-  streamerName = 'GUFFBOX HOST',
+  streamerName = 'THE CRICKET GUFF HOST',
   isVisible = true,
   onClose,
 }) => {

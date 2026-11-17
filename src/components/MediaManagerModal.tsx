@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Granular 30+ Video Registry & Media Manager (IndexedDB Powered)
+// The Cricket Guff Studio — Granular 30+ Video Registry & Media Manager (IndexedDB Powered)
 
 import React, { useState, useEffect } from 'react';
 import { MediaSlotInfo, mediaRegistry } from '../utils/mediaRegistry';

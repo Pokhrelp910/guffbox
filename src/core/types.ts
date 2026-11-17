@@ -1,4 +1,4 @@
-// GuffBox Cricket Studio — Core MCC Cricket Types & Interfaces
+// The Cricket Guff Studio — Core MCC Cricket Types & Interfaces
 
 export type DismissalType =
   | 'bowled'
